@@ -1,0 +1,63 @@
+REGISTER route ko hatao kyuki log sirf login hi karenge, register toh admin karega.
+
+(X) create retailer me "shop ka name" and "payment qr" and bhi dalna hai
+
+key validity, admin set karega toh key pade-pade bhi expire ho jayegi. So does the key needs to be set the validity on creation
+
+
+{
+  // Ownership Trail
+  createdBy: "superAdmin001",               // UID of the Super Admin
+  superDistributor: "superDistributorX",    // UID of Super Distributor (if credited)
+  distributor: "distributorY",              // UID of Distributor (if credited)
+  retailer: "retailerZ",                    // UID of Retailer (final owner)
+
+  assignedTo: "retailerZ",                  // Who currently holds the key
+  assignedRole: "retailer",                 // Current holder’s role
+
+  // Provisioning Details
+  keyCode: "secureHashValue",               // Set only when provisioned by retailer
+  provisionedAt: Timestamp,                 // Set when key is activated on device
+
+  // Unlock Code Logic
+  unlockCodes: ["123456", "328479", ...],   // Remaining one-time codes (max 12)
+
+  // Status & Control Flags
+  status: "provisioned",                    // "unassigned" | "credited" | "provisioned" | "revoked" | "expired"
+  revokedAt: null,                          // Timestamp of revocation, if any
+
+  // Metadata
+  createdAt: Timestamp,
+  validUntil: Timestamp,
+}
+
+key: {
+  createdBy: "superAdmin001",
+  superDistributor: "superDistributorX",
+  distributor: "distributorY",
+  retailer: "retailerZ",      
+
+  assignedTo: "retailerZ",    
+  assignedRole: "retailer",   
+
+  keyCode: "secureHashValue",  
+  provisionedAt: Timestamp,      
+
+  unlockCodes: ["123456", "328479", ...],   
+
+  status: "provisioned",  // "unassigned" | "credited" | "provisioned" | "revoked" | "expired"
+  revokedAt: null,
+  
+  createdAt: Timestamp,
+  validUntil: Timestamp,
+}
+
+
+wallet: {
+  availableKeys: 12,            // Yet to be provisioned or transferred
+  totalKeysReceived: 40,        // All-time credits from above
+  totalKeysTransferred: 22,     // Passed to sub-users
+  totalProvisioned: 6,          // Assigned to end devices
+  totalRevoked: 4,              // Taken back by Super Admin
+  activeDevices: 6,             // Same as provisioned (optionally synced)
+}
