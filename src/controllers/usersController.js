@@ -1,3 +1,4 @@
+const { request } = require('../app');
 const { admin, db } = require('../config/firebase');
 async function createSuperDistributor(req, res) {
   try {
@@ -14,8 +15,8 @@ async function createSuperDistributor(req, res) {
       name,
       phone,
       role: "super_distributor",
-      parentId: req.superAdmin.uid,
-      hierarchy: { superAdmin: req.superAdmin.uid },
+      parentId: req.user.uid,
+      hierarchy: { superAdmin: req.user.uid },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       status: "active"
     };
@@ -48,13 +49,13 @@ async function createDistributor(req, res) {
       role: "distributor",
       parentId: superDistributorId,
       hierarchy: {
-        superAdmin: req.superAdmin.uid,
+        superAdmin: superDistributorDoc.data().hierarchy.superAdmin,
         superDistributor: superDistributorId
       },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       status: "active"
     };
-    await db.collection('users').doc(userRecord.uid).set(userData);
+    await db.collection('users').doc(userRecord.uid).set(userData, { merge: true });
     res.json({ success: true, user: userData });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -89,7 +90,7 @@ async function createRetailer(req, res) {
       role: "retailer",
       parentId: distributorId,
       hierarchy: {
-        superAdmin: req.superAdmin.uid,
+        superAdmin: distributorDoc.data().hierarchy.superAdmin,
         superDistributor: superDistributorId,
         distributor: distributorId
       },
@@ -137,9 +138,28 @@ async function getHierarchy(req, res) {
   }
 }
 
+async function getMe(req, res) {
+  try {
+    // req.user is set by authenticateUser middleware (contains uid)
+    const userDoc = await db.collection('users').doc(req.user.uid).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userData = userDoc.data();
+    // Optionally, remove sensitive fields before sending
+    delete userData.password; // if you store passwords (not recommended)
+    res.json({ user: userData });
+  } catch (error) {
+    console.error('Error fetching user profile:', error.message);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+}
 module.exports = {
   createSuperDistributor,
   createDistributor,
   createRetailer,
-  getHierarchy
+  getHierarchy,
+  getMe
 };

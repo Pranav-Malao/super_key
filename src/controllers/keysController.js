@@ -4,7 +4,7 @@ const { logKeyTransaction, generateUnlockCodes } = require('../utils');
 async function createKeys(req, res) {
   try {
     const { count = 1, validityInMonths } = req.body;
-    if (!Number.isInteger(count) || count <= 0 || count > 500) {
+    if (!Number.isInteger(count) || count <= 0 || count > 100) {
       return res.status(400).json({ error: 'Invalid count' });
     }
     if (validityInMonths < 0) {

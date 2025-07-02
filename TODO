@@ -1,8 +1,6 @@
 REGISTER route ko hatao kyuki log sirf login hi karenge, register toh admin karega.
 
-(X) create retailer me "shop ka name" and "payment qr" and bhi dalna hai
-
-key validity, admin set karega toh key pade-pade bhi expire ho jayegi. So does the key needs to be set the validity on creation
+key validity, admin set karega toh key pade-pade bhi expire ho jayegi.
 
 
 {

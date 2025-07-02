@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
+const { requireRole, authenticateUser } = require('../middleware/authMiddleware');
 const { createEndUser } = require('../controllers/endUsersController');
 
-router.post('/create', authenticateToken, requireRole(['retailer']), createEndUser);
+router.post('/create', authenticateUser, requireRole(['retailer']), createEndUser);
 
 module.exports = router;

@@ -6,6 +6,8 @@ import RegisterPage from "./registerPage";
 import CurrentUser from "./currentUser";
 import { Link } from "react-router-dom";
 import "./App.css";
+import LoginForm from "./loginForm";
+import Wallet from "./wallet"
 
 function App() {
   return (
@@ -18,10 +20,16 @@ function App() {
         <Link to="/login">Login</Link>
         <br />
         <Link to="/dashboard">Dashboard</Link>
+        <br />
+        <Link to="/loginNew">Login New</Link>
+        <br />
+        <Link to="/wallet">Wallet</Link>
         <Routes>
           <Route path="/currentUser" element={<CurrentUser />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/loginNew" element={<LoginForm />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/wallet" element={<Wallet />} />
           
           {/* Default route */}
           <Route path="*" element={<Navigate to="/login" />} />

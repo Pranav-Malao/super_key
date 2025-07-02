@@ -1,6 +1,7 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, inMemoryPersistence } from "firebase/auth";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyBka4Y0wKLdUAezeemKmkAuDD9wAQ2z9Ks",
@@ -10,4 +11,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+const auth = getAuth(app);
+
+// Set persistence to in-memory (no local/session storage)
+setPersistence(auth, inMemoryPersistence);
+
+export { auth };

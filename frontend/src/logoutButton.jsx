@@ -1,7 +1,7 @@
 // src/LogoutButton.jsx
 import React from "react";
 import { signOut } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth } from "./config/firebase";
 
 const LogoutButton = ({ onLogout }) => {
   const handleLogout = async () => {
