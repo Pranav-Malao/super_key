@@ -19,6 +19,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+// src/app.js or wherever your main Express app is
+app.get('/', (req, res) => {
+  res.status(200).json({uptime: process.uptime()});
+});
+
 app.use('/api/auth', require('./routes/auth').router);
 app.use('/api/users', require('./routes/users'));
 app.use('/api/endusers', require('./routes/endUsers'));

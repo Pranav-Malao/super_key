@@ -1,4 +1,3 @@
-const { request } = require('../app');
 const { admin, db } = require('../config/firebase');
 async function createSuperDistributor(req, res) {
   try {
