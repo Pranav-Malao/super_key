@@ -1,4 +1,4 @@
-REGISTER route ko hatao kyuki log sirf login hi karenge, register toh admin karega.
+key validity ka dekhna hai ki kya karna hai
 
 key validity, admin set karega toh key pade-pade bhi expire ho jayegi.
 

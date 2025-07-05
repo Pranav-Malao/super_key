@@ -145,6 +145,7 @@ async function createEndUser(req, res) {
         toUser: consumerId,
         fromRole: 'retailer',
         toRole: 'end_user',
+        participants: [retailerId, consumerId],
         performedBy: retailerId,
         reason: `Provisioned to user ${fullName}`
       });

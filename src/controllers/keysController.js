@@ -62,6 +62,7 @@ async function createKeys(req, res) {
       action: 'created',
       fromUser: null,
       toUser: req.user.uid,
+      participants: [req.user.uid],
       fromRole: null,
       toRole: 'super_admin',
       performedBy: req.user.uid,
@@ -168,6 +169,7 @@ async function transferKeys(req, res) {
       keyIds,
       fromUser: fromUserId,
       toUser: toUserId,
+      participants: [fromUserId, toUserId],
       fromRole,
       toRole: toUser.role,
       performedBy: fromUserId,
@@ -234,6 +236,7 @@ async function revokeKeys (req, res) {
       performedBy: req.user.uid,
       fromRole: 'super_admin',
       toRole: null,
+      participants: [userId],
       reason: reason || `Revoked by Super Admin`
     });
 
@@ -244,8 +247,48 @@ async function revokeKeys (req, res) {
   }
 }
 
+async function getKeyTransactions (req, res) {
+  const uid = req.user.uid;
+  const pageSize = parseInt(req.query.pageSize) || 10;
+  const cursor = req.query.cursor ? Number(req.query.cursor) : null;
+
+  try {
+    let query = db.collection('keyTransactions')
+      .where('participants', 'array-contains', uid)
+      .orderBy('timestamp', 'desc')
+      .limit(pageSize);
+
+    if (cursor) {
+      query = query.startAfter(admin.firestore.Timestamp.fromMillis(cursor));
+    }
+
+    const snap = await query.get();
+
+    const transactions = snap.docs.map(doc => {
+      const data = doc.data();
+      const { keyIds, participants, performedBy, ...dataWithoutKeyIds } = data;
+      return { id: doc.id, ...dataWithoutKeyIds };
+    });
+    
+    const hasMore = snap.size === pageSize;
+    let nextCursor = null;
+    if (hasMore) {
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      nextCursor = lastDoc ? lastDoc.data().timestamp.toMillis() : null;
+    }
+
+    res.json({ transactions, nextCursor, hasMore });
+  } catch (err) {
+    console.error('Error fetching paginated key transactions:', err);
+    res.status(500).json({ error: 'Failed to retrieve transactions' });
+  }
+}
+
+
+
 module.exports = {
   createKeys,
   transferKeys,
-  revokeKeys
+  revokeKeys,
+  getKeyTransactions
 };

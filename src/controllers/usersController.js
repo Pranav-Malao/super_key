@@ -128,7 +128,8 @@ async function getHierarchy(req, res) {
     const snapshot = await query.get();
     const users = [];
     snapshot.forEach(doc => {
-      users.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      users.push({ uid: data.uid, name: data.name });
     });
 
     res.json({ users });

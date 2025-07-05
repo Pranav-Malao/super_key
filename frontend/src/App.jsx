@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import "./App.css";
 import LoginForm from "./loginForm";
 import Wallet from "./wallet"
+import KeyTransactions from "./keyTransactions";
 
 function App() {
   return (
@@ -24,12 +25,15 @@ function App() {
         <Link to="/loginNew">Login New</Link>
         <br />
         <Link to="/wallet">Wallet</Link>
+        <br />
+        <Link to="/keyTransactions">KeyTransactions</Link>
         <Routes>
           <Route path="/currentUser" element={<CurrentUser />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/loginNew" element={<LoginForm />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/wallet" element={<Wallet />} />
+          <Route path="/keyTransactions" element={<KeyTransactions />} />
           
           {/* Default route */}
           <Route path="*" element={<Navigate to="/login" />} />
