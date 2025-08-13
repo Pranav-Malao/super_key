@@ -1,9 +1,12 @@
-const { db, admin } = require('../config/firebase');
+const { admin, db } = require('../config/firebase');
+const Key = require('../models/Key');
 const { logKeyTransaction, generateUnlockCodes } = require('../utils');
 
+// 🔑 Create Keys
 async function createKeys(req, res) {
   try {
     const { count = 1, validityInMonths } = req.body;
+
     if (!Number.isInteger(count) || count <= 0 || count > 100) {
       return res.status(400).json({ error: 'Invalid count' });
     }
@@ -11,41 +14,34 @@ async function createKeys(req, res) {
       return res.status(400).json({ error: 'Invalid validity' });
     }
 
-    // Use Firestore server timestamp for now
     const now = admin.firestore.Timestamp.now();
     let validUntil = null;
     if (validityInMonths) {
-      // Convert server timestamp to JS Date, add months, then convert back to Timestamp
-      const nowDate = new Date(); // This will be close to server time, but for true server time, you may need to use a Cloud Function
+      const nowDate = new Date();
       nowDate.setMonth(nowDate.getMonth() + validityInMonths);
       validUntil = admin.firestore.Timestamp.fromDate(nowDate);
     }
 
+    const unlockCodes = generateUnlockCodes(12);
     const batch = db.batch();
     const createdKeyIds = [];
-    const unlockCodes = generateUnlockCodes(12);
 
     for (let i = 0; i < count; i++) {
       const keyRef = db.collection('keys').doc();
-      batch.set(keyRef, {
+      const key = new Key({
+        id: keyRef.id,
         createdBy: req.user.uid,
         assignedTo: req.user.uid,
         assignedRole: 'super_admin',
-        superDistributor: null,
-        distributor: null,
-        retailer: null,
-        keyCode: null,
-        provisionedAt: null,
-        unlockCodes: unlockCodes,
-        status: 'unassigned',
-        revokedAt: null,
+        unlockCodes,
         createdAt: now,
         validUntil
       });
+
+      batch.set(keyRef, key.toFirestore());
       createdKeyIds.push(keyRef.id);
     }
 
-    // Update Super Admin wallet
     const adminRef = db.collection('users').doc(req.user.uid);
     batch.set(adminRef, {
       wallet: {
@@ -56,7 +52,6 @@ async function createKeys(req, res) {
 
     await batch.commit();
 
-    // Log transaction
     await logKeyTransaction({
       keyIds: createdKeyIds,
       action: 'created',
@@ -76,6 +71,7 @@ async function createKeys(req, res) {
   }
 }
 
+// 🔄 Transfer Keys
 async function transferKeys(req, res) {
   try {
     const { toUserId, count } = req.body;
@@ -85,68 +81,54 @@ async function transferKeys(req, res) {
       return res.status(400).json({ error: 'Invalid toUserId or count' });
     }
 
-    const fromUserDoc = await db.collection('users').doc(req.user.uid).get();
-    if (!fromUserDoc.exists) return res.status(404).json({ error: 'Sender not found' });
-    const fromUser = fromUserDoc.data();
-    const fromRole = fromUser.role;
+    const fromUserDoc = await db.collection('users').doc(fromUserId).get();
+    const toUserDoc = await db.collection('users').doc(toUserId).get();
+    if (!fromUserDoc.exists || !toUserDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-    // Fetch receiver
-    const toUserSnap = await db.collection('users').doc(toUserId).get();
-    if (!toUserSnap.exists) return res.status(404).json({ error: 'Recipient not found' });
-    const toUser = toUserSnap.data();
+    const fromRole = fromUserDoc.data().role;
+    const toRole = toUserDoc.data().role;
 
-    // Enforce transfer hierarchy
     const validTransfers = {
       super_admin: ['super_distributor'],
       super_distributor: ['distributor'],
       distributor: ['retailer']
     };
 
-    if (!validTransfers[fromRole]?.includes(toUser.role)) {
+    if (!validTransfers[fromRole]?.includes(toRole)) {
       return res.status(403).json({ error: 'Unauthorized role transfer' });
     }
 
-    // Determine eligible key status
     const allowedStatus = fromRole === 'super_admin' ? ['unassigned'] : ['credited'];
+    const keys = await Key.fetchAvailableForUser(fromUserId, allowedStatus, count);
 
-    // Fetch available keys
-    const keysSnap = await db.collection('keys')
-      .where('assignedTo', '==', fromUserId)
-      .where('status', 'in', allowedStatus)
-      .limit(count)
-      .get();
-
-    if (keysSnap.size < count) {
-      return res.status(400).json({ error: `Only ${keysSnap.size} transferable key(s) found` });
+    if (keys.length < count) {
+      return res.status(400).json({ error: `Only ${keys.length} transferable key(s) found` });
     }
 
-    const senderSnap = await db.collection('users').doc(fromUserId).get();
-    const sender = senderSnap.data();
-    console.log(sender);
-    const now = admin.firestore.Timestamp.now();
     const batch = db.batch();
     const keyIds = [];
+    const now = admin.firestore.Timestamp.now();
 
-    keysSnap.forEach(doc => {
-      const keyRef = doc.ref;
+    for (const key of keys) {
+      const keyRef = db.collection('keys').doc(key.id);
       const update = {
         assignedTo: toUserId,
-        assignedRole: toUser.role,
+        assignedRole: toRole,
         transferredFrom: fromUserId,
         transferredAt: now,
         status: 'credited'
       };
 
-      // Set flat role trail
       if (fromRole === 'super_admin') update.superDistributor = toUserId;
       if (fromRole === 'super_distributor') update.distributor = toUserId;
       if (fromRole === 'distributor') update.retailer = toUserId;
 
       batch.update(keyRef, update);
-      keyIds.push(keyRef.id);
-    });
+      keyIds.push(key.id);
+    }
 
-    // Update wallets
     const fromUserRef = db.collection('users').doc(fromUserId);
     const toUserRef = db.collection('users').doc(toUserId);
 
@@ -164,14 +146,13 @@ async function transferKeys(req, res) {
 
     await batch.commit();
 
-    // Log transaction as single event
     await logKeyTransaction({
       keyIds,
       fromUser: fromUserId,
       toUser: toUserId,
       participants: [fromUserId, toUserId],
       fromRole,
-      toRole: toUser.role,
+      toRole,
       performedBy: fromUserId,
       action: 'credited',
       reason: `Transferred ${keyIds.length} key(s)`
@@ -184,7 +165,8 @@ async function transferKeys(req, res) {
   }
 }
 
-async function revokeKeys (req, res) {
+// 🚫 Revoke Keys
+async function revokeKeys(req, res) {
   try {
     const { userId, count, reason = '' } = req.body;
 
@@ -192,33 +174,26 @@ async function revokeKeys (req, res) {
       return res.status(400).json({ error: 'Invalid userId or count' });
     }
 
-    // Get keys assigned to this user
-    const keysSnap = await db.collection('keys')
-      .where('assignedTo', '==', userId)
-      .where('status', '==', 'credited')
-      .limit(count)
-      .get();
-
-    if (keysSnap.empty) {
+    const keys = await Key.fetchAvailableForUser(userId, ['credited'], count);
+    if (keys.length === 0) {
       return res.status(404).json({ error: 'No eligible keys found for revocation' });
     }
 
-    const now = admin.firestore.Timestamp.now();
     const batch = db.batch();
+    const now = admin.firestore.Timestamp.now();
     const keyIds = [];
 
-    keysSnap.forEach(doc => {
-      const ref = doc.ref;
-      batch.update(ref, {
+    for (const key of keys) {
+      const keyRef = db.collection('keys').doc(key.id);
+      batch.update(keyRef, {
         assignedTo: null,
         assignedRole: null,
         status: 'revoked',
         revokedAt: now
       });
-      keyIds.push(ref.id);
-    });
+      keyIds.push(key.id);
+    }
 
-    // Wallet adjustment
     const userRef = db.collection('users').doc(userId);
     batch.update(userRef, {
       'wallet.availableKeys': admin.firestore.FieldValue.increment(-keyIds.length),
@@ -227,7 +202,6 @@ async function revokeKeys (req, res) {
 
     await batch.commit();
 
-    // Log the revocation
     await logKeyTransaction({
       keyIds,
       fromUser: userId,
@@ -247,7 +221,8 @@ async function revokeKeys (req, res) {
   }
 }
 
-async function getKeyTransactions (req, res) {
+// 📜 Get Key Transactions
+async function getKeyTransactions(req, res) {
   const uid = req.user.uid;
   const pageSize = parseInt(req.query.pageSize) || 10;
   const cursor = req.query.cursor ? Number(req.query.cursor) : null;
@@ -266,25 +241,19 @@ async function getKeyTransactions (req, res) {
 
     const transactions = snap.docs.map(doc => {
       const data = doc.data();
-      const { keyIds, participants, performedBy, ...dataWithoutKeyIds } = data;
-      return { id: doc.id, ...dataWithoutKeyIds };
+      const { keyIds, participants, performedBy, ...rest } = data;
+      return { id: doc.id, ...rest };
     });
-    
+
     const hasMore = snap.size === pageSize;
-    let nextCursor = null;
-    if (hasMore) {
-      const lastDoc = snap.docs[snap.docs.length - 1];
-      nextCursor = lastDoc ? lastDoc.data().timestamp.toMillis() : null;
-    }
+    const nextCursor = hasMore ? snap.docs[snap.docs.length - 1].data().timestamp.toMillis() : null;
 
     res.json({ transactions, nextCursor, hasMore });
   } catch (err) {
-    console.error('Error fetching paginated key transactions:', err);
+    console.error('Error fetching key transactions:', err);
     res.status(500).json({ error: 'Failed to retrieve transactions' });
   }
 }
-
-
 
 module.exports = {
   createKeys,

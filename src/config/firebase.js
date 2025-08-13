@@ -6,12 +6,9 @@ const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 const serviceAccount = require(path.resolve(serviceAccountPath));
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: process.env.FIREBASE_RTDB_URL,
-  
+  credential: admin.credential.cert(serviceAccount)
 });
 
-const db = admin.firestore(); // For Firestore
-const dbRT = admin.database(); // For Realtime Database
+const db = admin.firestore();
 
-module.exports = { db, dbRT, admin };
+module.exports = { db, admin };

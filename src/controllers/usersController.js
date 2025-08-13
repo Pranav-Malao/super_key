@@ -1,26 +1,31 @@
-const { admin, db } = require('../config/firebase');
+const { admin } = require('../config/firebase');
+const { SuperDistributorUser, DistributorUser, RetailerUser, BaseUser } = require('../models/User');
+
 async function createSuperDistributor(req, res) {
   try {
     const { email, name, phone, password } = req.body;
     if (!email || !name || !phone || !password) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    // Create user in Firebase Auth
-    const userRecord = await admin.auth().createUser({ email, password, displayName: name, phoneNumber: phone });
-    // Create user profile in Firestore
-    const userData = {
+
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: name,
+      phoneNumber: phone
+    });
+
+    const user = new SuperDistributorUser({
       uid: userRecord.uid,
       email,
       name,
       phone,
-      role: "super_distributor",
       parentId: req.user.uid,
-      hierarchy: { superAdmin: req.user.uid },
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active"
-    };
-    await db.collection('users').doc(userRecord.uid).set(userData);
-    res.json({ success: true, user: userData });
+      hierarchy: { superAdmin: req.user.uid }
+    });
+
+    await user.save();
+    res.json({ success: true, user: user.toFirestore() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -32,30 +37,33 @@ async function createDistributor(req, res) {
     if (!email || !name || !phone || !password || !superDistributorId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    // Fetch super distributor
-    const superDistributorDoc = await db.collection('users').doc(superDistributorId).get();
+
+    const superDistributorDoc = await admin.firestore().collection('users').doc(superDistributorId).get();
     if (!superDistributorDoc.exists || superDistributorDoc.data().role !== 'super_distributor') {
       return res.status(400).json({ error: 'Invalid super distributor' });
     }
-    // Create user in Firebase Auth
-    const userRecord = await admin.auth().createUser({ email, password, displayName: name, phoneNumber: phone });
-    // Create user profile in Firestore
-    const userData = {
+
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: name,
+      phoneNumber: phone
+    });
+
+    const user = new DistributorUser({
       uid: userRecord.uid,
       email,
       name,
       phone,
-      role: "distributor",
       parentId: superDistributorId,
       hierarchy: {
         superAdmin: superDistributorDoc.data().hierarchy.superAdmin,
         superDistributor: superDistributorId
-      },
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active"
-    };
-    await db.collection('users').doc(userRecord.uid).set(userData, { merge: true });
-    res.json({ success: true, user: userData });
+      }
+    });
+
+    await user.save();
+    res.json({ success: true, user: user.toFirestore() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -64,40 +72,45 @@ async function createDistributor(req, res) {
 async function createRetailer(req, res) {
   try {
     const { email, name, phone, password, shopName, paymentQr, superDistributorId, distributorId } = req.body;
-    if (!superDistributorId || !distributorId || !email || !name || !phone || !password || !shopName || !paymentQr) {
+    if (!email || !name || !phone || !password || !shopName || !paymentQr || !superDistributorId || !distributorId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    // Fetch super distributor and distributor
-    const superDistributorDoc = await db.collection('users').doc(superDistributorId).get();
-    const distributorDoc = await db.collection('users').doc(distributorId).get();
+
+    const superDistributorDoc = await admin.firestore().collection('users').doc(superDistributorId).get();
+    const distributorDoc = await admin.firestore().collection('users').doc(distributorId).get();
+
     if (!superDistributorDoc.exists || superDistributorDoc.data().role !== 'super_distributor') {
       return res.status(400).json({ error: 'Invalid super distributor' });
     }
+
     if (!distributorDoc.exists || distributorDoc.data().role !== 'distributor' || distributorDoc.data().parentId !== superDistributorId) {
       return res.status(400).json({ error: 'Invalid distributor' });
     }
-    // Create user in Firebase Auth
-    const userRecord = await admin.auth().createUser({ email, password, displayName: name, phoneNumber: phone });
-    // Create user profile in Firestore
-    const userData = {
+
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: name,
+      phoneNumber: phone
+    });
+
+    const user = new RetailerUser({
       uid: userRecord.uid,
       email,
       name,
       phone,
-      shopName,
-      paymentQr,
-      role: "retailer",
       parentId: distributorId,
       hierarchy: {
         superAdmin: distributorDoc.data().hierarchy.superAdmin,
         superDistributor: superDistributorId,
         distributor: distributorId
       },
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active"
-    };
-    await db.collection('users').doc(userRecord.uid).set(userData);
-    res.json({ success: true, user: userData });
+      shopName,
+      paymentQr
+    });
+
+    await user.save();
+    res.json({ success: true, user: user.toFirestore() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -106,9 +119,8 @@ async function createRetailer(req, res) {
 async function getHierarchy(req, res) {
   try {
     const { role } = req.userData;
-    let query = db.collection('users');
+    let query = admin.firestore().collection('users');
 
-    // Determine the immediate child role
     const childRoles = {
       super_admin: 'super_distributor',
       super_distributor: 'distributor',
@@ -116,20 +128,16 @@ async function getHierarchy(req, res) {
     };
 
     if (role === 'retailer') {
-      // Retailers see end users
-      query = db.collection('endUsers').where('retailerId', '==', req.user.uid);
+      query = admin.firestore().collection('endUsers').where('retailerId', '==', req.user.uid);
     } else {
       const childRole = childRoles[role];
-      query = query
-        .where('role', '==', childRole)
-        .where('parentId', '==', req.user.uid);
+      query = query.where('role', '==', childRole).where('parentId', '==', req.user.uid);
     }
 
     const snapshot = await query.get();
-    const users = [];
-    snapshot.forEach(doc => {
+    const users = snapshot.docs.map(doc => {
       const data = doc.data();
-      users.push({ uid: data.uid, name: data.name });
+      return { uid: data.uid, name: data.name };
     });
 
     res.json({ users });
@@ -139,27 +147,51 @@ async function getHierarchy(req, res) {
 }
 
 async function getMe(req, res) {
+  console.log(req.user.uid)
   try {
-    // req.user is set by authenticateUser middleware (contains uid)
-    const userDoc = await db.collection('users').doc(req.user.uid).get();
-
-    if (!userDoc.exists) {
+    const user = await BaseUser.fetch(req.user.uid);
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const userData = userDoc.data();
-    // Optionally, remove sensitive fields before sending
-    delete userData.password; // if you store passwords (not recommended)
+    const userData = user.toFirestore();
+    delete userData.password;
     res.json({ user: userData });
   } catch (error) {
-    console.error('Error fetching user profile:', error.message);
     res.status(500).json({ error: 'Failed to fetch user profile' });
   }
 }
+
+// controllers/userController.js
+
+async function getEndUsers(req, res) { //retailer will see all end users
+  try {
+    const retailerId = req.user.uid;
+
+    const snapshot = await admin.firestore()
+      .collection('endUsers')
+      .where('retailerId', '==', retailerId)
+      .get();
+
+    const endUsers = [];
+
+    snapshot.forEach(doc => {
+      endUsers.push(doc.data());
+    });
+
+    res.json({ endUsers });
+  } catch (error) {
+    console.error('Error fetching end users:', error);
+    res.status(500).json({ error: 'Failed to fetch end users' });
+  }
+}
+
+
 module.exports = {
   createSuperDistributor,
   createDistributor,
   createRetailer,
   getHierarchy,
-  getMe
+  getMe,
+  getEndUsers
 };

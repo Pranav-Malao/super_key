@@ -1,3 +1,7 @@
 /node_modules
 super-key-4a382-firebase-adminsdk-fbsvc-84ef0e8e76.json
+keygenration-firebase-adminsdk-fbsvc-fe64dd7de7.json
 .env
+/src/controllers/oldKeysController.js
+/src/controllers/oldEndUserController.js
+/src/controllers/oldUserController.js

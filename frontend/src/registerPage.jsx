@@ -31,27 +31,27 @@ const RegisterPage = () => {
       const idToken = await userCredential.user.getIdToken();
       console.log("idToken", idToken);
 
-      // Send data to backend
-      const response = await fetch("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          idToken,
-          name: form.name,
-          phone: form.phone,
-          role: form.role,
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert("Registration successful!");
-        // Redirect or update UI as needed
-      } else {
-        setError(data.error || "Registration failed");
-      }
+      // // Send data to backend
+      // const response = await fetch("http://localhost:3000/api/auth/register", {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //     "Authorization": `Bearer ${idToken}`
+      //   },
+      //   body: JSON.stringify({
+      //     idToken,
+      //     name: form.name,
+      //     phone: form.phone,
+      //     role: form.role,
+      //   }),
+      // });
+      // const data = await response.json();
+      // if (data.success) {
+      //   alert("Registration successful!");
+      //   // Redirect or update UI as needed
+      // } else {
+      //   setError(data.error || "Registration failed");
+      // }
     } catch (err) {
       setError(err.message);
     }

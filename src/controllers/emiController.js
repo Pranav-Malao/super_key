@@ -14,9 +14,7 @@ async function payEMI(req, res) {
     if (!userDoc.exists || userData.registeredBy !== req.user.uid) {
       return res.status(403).json({ error: 'Not authorized to pay EMI for this user' });
     }
-    if (amount > emiData.amount_left) {
-      return res.status(400).json({ error: 'Payment exceeds remaining amount' });
-    }
+
     const emiSnap = await userRef.collection('emi')
       .orderBy('start_date', 'desc') // Assuming latest EMI record
       .limit(1)
@@ -30,6 +28,9 @@ async function payEMI(req, res) {
     if (emiData.installments_left <= 0) {
       return res.status(400).json({ error: 'EMI already fully paid' });
     }
+    if (amount > emiData.amount_left) {
+      return res.status(400).json({ error: 'Payment exceeds remaining amount' });
+    }
 
     const now = admin.firestore.Timestamp.now();
     const nextDue = emiData.next_installment_date.toDate();
@@ -37,9 +38,10 @@ async function payEMI(req, res) {
 
     const newInstallments = emiData.installments_left - 1;
     const newAmountLeft = emiData.amount_left - amount;
-    const newDue = admin.firestore.Timestamp.fromDate(new Date(
-      nextDue.getTime() + 2592000000 // next month
-    ));
+    // Add 1 calendar month to nextDue, handling month/year rollovers
+    const newDueDate = new Date(nextDue);
+    newDueDate.setMonth(newDueDate.getMonth() + 1);
+    const newDue = admin.firestore.Timestamp.fromDate(newDueDate);
 
     const batch = db.batch();
 
