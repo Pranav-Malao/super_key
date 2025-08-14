@@ -15,6 +15,7 @@ async function createEndUser(req, res) {
       emi
     } = req.body;
 
+    console.log(req.body);
     const retailerId = req.user?.uid;
     if (!retailerId) return res.status(401).json({ error: 'Unauthorized retailer' });
 
@@ -23,7 +24,7 @@ async function createEndUser(req, res) {
     }
 
     const { start_date, installments_left, monthly_installment, total_amount } = emi;
-    if (!start_date || !installments_left || !monthly_installment || !total_amount) {
+    if (start_date==null || installments_left==null|| monthly_installment == null || !total_amount==null) {
       return res.status(400).json({ error: 'Missing required EMI fields' });
     }
 
