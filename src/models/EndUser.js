@@ -35,6 +35,7 @@ class EndUser {
       deviceName: this.deviceName,
       imei1: this.imei1,
       imei2: this.imei2,
+      keyId: this.keyId,
       retailerId: this.retailerId,
       registeredBy: this.registeredBy,
       createdAt: this.createdAt

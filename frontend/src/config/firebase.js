@@ -4,12 +4,12 @@ import { getAuth, setPersistence, inMemoryPersistence } from "firebase/auth";
 
 
 const firebaseConfig = {
-  // apiKey: "AIzaSyBka4Y0wKLdUAezeemKmkAuDD9wAQ2z9Ks",
-  // authDomain: "super-key-4a382.firebaseapp.com",
-  // projectId: "super-key-4a382",
-  apiKey: "AIzaSyAdIlGyiI8xmsjCmK9VpLFb_legv8yXWkw",
-  authDomain: "keygenration.firebaseapp.com",
-  projectId: "keygenration",
+  apiKey: "AIzaSyBka4Y0wKLdUAezeemKmkAuDD9wAQ2z9Ks",
+  authDomain: "super-key-4a382.firebaseapp.com",
+  projectId: "super-key-4a382",
+  // apiKey: "AIzaSyAdIlGyiI8xmsjCmK9VpLFb_legv8yXWkw",
+  // authDomain: "keygenration.firebaseapp.com",
+  // projectId: "keygenration",
 };
 
 const app = initializeApp(firebaseConfig);
